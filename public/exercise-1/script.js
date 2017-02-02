@@ -19,25 +19,35 @@ d3.queue()
 
 function dataLoaded(err,trips,stations){
 	//Create a crossfilter with trips
-
+  var cf = crossfilter(trips);
 	//Create a dimension on bike_nr
-
-	//Create a dimension on time of the day 
+  var bike_nr = cf.dimension(function(d){return d.bike_nr});
+	//Create a dimension on time of the day
+	var timeOfDay = cf.dimension(function(d){
+			return d.startTime.getHours();
+	});
 		//Hint: the API for crossfilter dimension requires an accessor function argument
 		//crossfilter.dimension(function(d){return ...})
 		//Within this accessor function, use Date.getHours() and Date.getMinutes() to convert a Date object to a time of the day
 
 	//Using console.log, log out the answer to the following questions
 	//What % of trips take place between 5PM and 8PM?
-
+  timeOfDay.filter([17,20]);
+	console.log((timeOfDay.top(Infinity).length/trips.length).toFixed(4)*100 + '%');
 	//What % of trips take place before 9AM and after 5PM?
-
+  timeOfDay.filterFunction(function(d) { return d < 9 || d >= 17});
+	console.log((timeOfDay.top(Infinity).length/trips.length).toFixed(4)*100 + '%');
 	//How many trips were taken with each unique bike_nr? Which bike has the highest number of trip count?
 		//This will require the use dimension.group
+  var tripsByBikeGroup = bike_nr.group();
+	console.log(tripsByBikeGroup.top(Infinity));
+	console.log('The bike ' + tripsByBikeGroup.top(1)[0].key +' has '+ tripsByBikeGroup.top(1)[0].value +' times of trip count.');
 
 	//How much travel time was logged on each unique bike_nr? Which bike has the highest travel time logged?
 		//This will require the use dimension.group, but with a different reduce function
-
+  var bikesByTime = bike_nr.group().reduceSum(function(d){ return d.duration});
+	console.log(bikesByTime.top(Infinity));
+	console.log('The bike ' + bikesByTime.top(1)[0].key + ' has the highest travel time, which is ' +(bikesByTime.top(1)[0].value/3600).toFixed(2) + ' hours.');
 }
 
 function parseTrips(d){

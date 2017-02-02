@@ -23,10 +23,12 @@ function dataLoaded(err,trips,stations){
 	drawTimeOfDay(tripsByGender.top(Infinity), plot1);
 	drawUserType(tripsByGender.top(Infinity), plot2);
 	drawUserGender(tripsByGender.top(Infinity), plot3);
+	//console.log(tripsByGender.top(Infinity)); 150000+ rows
 }
 
 function drawTimeOfDay(arr,div){
 	//calculate w, h; append <svg> and <g> for plot area
+
 	var w = div.node().clientWidth - m.l - m.r,
 		h = div.node().clientHeight - m.t - m.b;
 	var plot = div
@@ -99,6 +101,7 @@ function drawTimeOfDay(arr,div){
 
 	function brushend(){
 		console.log('timeseries:brushend');
+
 		if(!d3.event.selection){
 			//if brush is cleared, then selected range will be empty
 			console.log('brush is cleared');
@@ -110,7 +113,18 @@ function drawTimeOfDay(arr,div){
 /*		Exercise 2 part 1:
 		With the selected range of the brush, update the crossfilter
 		and then update the userType and userGender pie charts
-*/	}
+*/
+
+    var selected = d3.event.selection.map(scaleX.invert);
+		console.log(selected);
+    var cfSelect = crossfilter(arr)
+		    .dimension(function(d){ return d.startTime.getHours() + d.startTime.getMinutes()/60 })
+		    .filterRange(selected);
+		var selectedArr = cfSelect.top(Infinity);
+    console.log(selectedArr);
+		drawUserType(selectedArr, plot2);
+		//drawUserGender(selectedArr, plot3);
+}
 
 }
 
@@ -143,7 +157,48 @@ function drawUserType(arr,div){
 	//Draw
 /*	Exercise 2 part 2: this part of the code does not account for the update and exit sets
 	Refractor this code to account for the update and exit sets
-*/	var slices = plot
+*/
+  // var slices = plot
+	// 		.append('g').attr('class','pie-chart')
+	// 		.attr('transform','translate('+w/2+','+h/2+')')
+	// 		.selectAll('.slice')
+	// 		.data( pie(tripsByUserType) );
+	//
+	//     slices.enter()
+	// 		.append('g').attr('class','slice')
+	// 		.merge(slices)
+	// 		.append('path')
+	// 		.transition()
+	// 		.attr('d',arc)
+	// 		.style('fill',function(d,i){
+	// 			return i===0?'#03afeb':null
+	// 		});
+	//
+  //     slices.exit().remove();
+
+	var pieChart = plot
+			.append('g').attr('class','pie-chart');
+
+	var update = pieChart
+    	.attr('transform','translate('+w/2+','+h/2+')')
+			.selectAll('.slice')
+			.data( pie(tripsByUserType) );
+
+	var enter = update.enter()
+			.append('g').attr('class','slice')
+			.append('path')
+			.transition()
+			.attr('d',arc)
+			.style('fill',function(d,i){
+				return i===0?'#03afeb':null
+			});
+
+      update.merge(enter);
+      update.exit().remove();
+			pieChart.exit().remove();
+
+
+/*var slices = plot
 		.append('g').attr('class','pie-chart')
 		.attr('transform','translate('+w/2+','+h/2+')')
 		.selectAll('.slice')
@@ -162,7 +217,7 @@ function drawUserType(arr,div){
 		.attr('transform',function(d){
 			var angle = (d.startAngle+d.endAngle)*180/Math.PI/2 - 90;
 			return 'rotate('+angle+')translate('+((Math.min(w,h)/2)+20)+')';
-		});
+		});*/
 }
 
 function drawUserGender(arr,div){
