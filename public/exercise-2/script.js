@@ -8,6 +8,26 @@ var plot1 = plots.filter(function(d,i){ return i===0;}),
 	plot2 = plots.filter(function(d,i){return i===1}),
 	plot3 = plots.filter(function(d,i){return i===2});
 
+	var w2 = plot2.node().clientWidth - m.l - m.r,
+		h2 = plot2.node().clientHeight - m.t - m.b;
+	var piePlot = plot2
+		.append('svg')
+		.attr('width', w2 + m.l + m.r)
+		.attr('height', h2 + m.t + m.b)
+		.append('g')
+		.attr('class','canvas')
+		.attr('transform','translate('+m.l+','+m.t+')');
+
+		var w3 = plot3.node().clientWidth - m.l - m.r,
+			h3 = plot3.node().clientHeight - m.t - m.b;
+		var piePlotGender = plot3
+			.append('svg')
+			.attr('width', w3 + m.l + m.r)
+			.attr('height', h3 + m.t + m.b)
+			.append('g')
+			.attr('class','canvas')
+			.attr('transform','translate('+m.l+','+m.t+')');
+
 d3.queue()
 	.defer(d3.csv,'../data/hubway_trips_reduced.csv',parseTrips)
 	.defer(d3.csv,'../data/hubway_stations.csv',parseStations)
@@ -122,22 +142,15 @@ function drawTimeOfDay(arr,div){
 		    .filterRange(selected);
 		var selectedArr = cfSelect.top(Infinity);
     console.log(selectedArr);
-		drawUserType(selectedArr, plot2);
+		drawUserType(selectedArr);
+		drawUserGender(selectedArr);
 		//drawUserGender(selectedArr, plot3);
 }
 
 }
 
-function drawUserType(arr,div){
-	var w = div.node().clientWidth - m.l - m.r,
-		h = div.node().clientHeight - m.t - m.b;
-	var plot = div
-		.append('svg')
-		.attr('width', w + m.l + m.r)
-		.attr('height', h + m.t + m.b)
-		.append('g')
-		.attr('class','canvas')
-		.attr('transform','translate('+m.l+','+m.t+')');
+function drawUserType(arr){
+
 
 	//Transform data
 	var tripsByUserType = d3.nest()
@@ -158,15 +171,49 @@ function drawUserType(arr,div){
 /*	Exercise 2 part 2: this part of the code does not account for the update and exit sets
 	Refractor this code to account for the update and exit sets
 */
-  // var slices = plot
-	// 		.append('g').attr('class','pie-chart')
-	// 		.attr('transform','translate('+w/2+','+h/2+')')
+// Draw or update piechart
+  var slices = piePlot
+			.append('g').attr('class','pie-chart')
+			.attr('transform','translate('+w2/2+','+h2/2+')')
+			.selectAll('.slice')
+			.data( pie(tripsByUserType) );
+
+	var pieUpdate = slices.enter()
+			.append('g').attr('class','slice')
+			.merge(slices);
+
+			pieUpdate
+			.append('path')
+			.transition(400)
+			.attr('d',arc)
+			.style('fill',function(d,i){
+				return i===0?'#03afeb':null
+			});
+
+
+// PROBLEMS ALERT! It will draw text for multiple times
+		var pieText	= pieUpdate.append('text')
+				.attr('transform',function(d){
+					var angle = (d.startAngle+d.endAngle)*180/Math.PI/2 - 90;
+					return 'rotate('+angle+')translate('+((Math.min(w,h)/2)+20)+')';
+				});
+		var	textUpdate = pieText
+				.merge(pieText)
+				.text(function(d){return d.data.key});
+
+      pieText.exit().remove();
+      slices.exit().remove();
+
+	// var pieChart = plot
+	// 		.append('g').attr('class','pie-chart');
+	//
+	// var update = pieChart
+  //   	.attr('transform','translate('+w/2+','+h/2+')')
 	// 		.selectAll('.slice')
 	// 		.data( pie(tripsByUserType) );
 	//
-	//     slices.enter()
+	// var enter = update.enter()
 	// 		.append('g').attr('class','slice')
-	// 		.merge(slices)
 	// 		.append('path')
 	// 		.transition()
 	// 		.attr('d',arc)
@@ -174,29 +221,9 @@ function drawUserType(arr,div){
 	// 			return i===0?'#03afeb':null
 	// 		});
 	//
-  //     slices.exit().remove();
-
-	var pieChart = plot
-			.append('g').attr('class','pie-chart');
-
-	var update = pieChart
-    	.attr('transform','translate('+w/2+','+h/2+')')
-			.selectAll('.slice')
-			.data( pie(tripsByUserType) );
-
-	var enter = update.enter()
-			.append('g').attr('class','slice')
-			.append('path')
-			.transition()
-			.attr('d',arc)
-			.style('fill',function(d,i){
-				return i===0?'#03afeb':null
-			});
-
-      update.merge(enter);
-      update.exit().remove();
-			pieChart.exit().remove();
-
+  //     update.merge(enter);
+  //     update.exit().remove();
+	// 		pieChart.exit().remove();
 
 /*var slices = plot
 		.append('g').attr('class','pie-chart')
@@ -220,19 +247,48 @@ function drawUserType(arr,div){
 		});*/
 }
 
-function drawUserGender(arr,div){
-	var w = div.node().clientWidth - m.l - m.r,
-		h = div.node().clientHeight - m.t - m.b;
-	var plot = div
-		.append('svg')
-		.attr('width', w + m.l + m.r)
-		.attr('height', h + m.t + m.b)
-		.append('g')
-		.attr('class','canvas')
-		.attr('transform','translate('+m.l+','+m.t+')');
+function drawUserGender(arr){
+
 
 /*	Exercise 2 part 3: can you complete the user gender pie chart?
-*/}
+*/
+		var tripsByGender = d3.nest()
+			.key(function(d){return d.userGender})
+			.rollup(function(leaves){return leaves.length})
+			.entries(arr);
+		console.log(tripsByGender);
+
+		//Further transform data to ready it for a pie layout
+		var pie = d3.pie()
+			.value(function(d){return d.value});
+		console.log( pie(tripsByGender) );
+
+		var arc = d3.arc()
+			.innerRadius(5)
+			.outerRadius(Math.min(w,h)/2);
+
+		// Draw or update piechart
+		var slices = piePlotGender
+				.append('g').attr('class','pie-chart')
+				.attr('transform','translate('+w2/2+','+h2/2+')')
+				.selectAll('.slice')
+				.data( pie(tripsByGender) );
+
+		var pieUpdate = slices.enter()
+				.append('g').attr('class','slice')
+				.merge(slices);
+
+				pieUpdate
+				.append('path')
+				.transition(400)
+				.attr('d',arc)
+				.style('fill',function(d,i){
+					if(i===0) {return '#03afeb'}
+					if(i===1) {return null}
+					if(i===2) {return '#ff549b'}
+				});
+
+}
 
 function parseTrips(d){
 	return {
