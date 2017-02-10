@@ -1,5 +1,3 @@
-//Exercise 2: an exercise that demonstrates how different modules might interact with a central crossfilter object and between each other
-
 var m = {t:85,r:100,b:50,l:100},
 	w = document.getElementById('plot1').clientWidth - m.l - m.r,
 	h = document.getElementById('plot1').clientHeight - m.t - m.b;
@@ -7,26 +5,6 @@ var plots = d3.selectAll('.plot');
 var plot1 = plots.filter(function(d,i){ return i===0;}),
 	plot2 = plots.filter(function(d,i){return i===1}),
 	plot3 = plots.filter(function(d,i){return i===2});
-
-	var w2 = plot2.node().clientWidth - m.l - m.r,
-		h2 = plot2.node().clientHeight - m.t - m.b;
-	var piePlot = plot2
-		.append('svg')
-		.attr('width', w2 + m.l + m.r)
-		.attr('height', h2 + m.t + m.b)
-		.append('g')
-		.attr('class','canvas')
-		.attr('transform','translate('+m.l+','+m.t+')');
-
-		var w3 = plot3.node().clientWidth - m.l - m.r,
-			h3 = plot3.node().clientHeight - m.t - m.b;
-		var piePlotGender = plot3
-			.append('svg')
-			.attr('width', w3 + m.l + m.r)
-			.attr('height', h3 + m.t + m.b)
-			.append('g')
-			.attr('class','canvas')
-			.attr('transform','translate('+m.l+','+m.t+')');
 
 d3.queue()
 	.defer(d3.csv,'../data/hubway_trips_reduced.csv',parseTrips)
@@ -43,12 +21,10 @@ function dataLoaded(err,trips,stations){
 	drawTimeOfDay(tripsByGender.top(Infinity), plot1);
 	drawUserType(tripsByGender.top(Infinity), plot2);
 	drawUserGender(tripsByGender.top(Infinity), plot3);
-	//console.log(tripsByGender.top(Infinity)); 150000+ rows
 }
 
 function drawTimeOfDay(arr,div){
 	//calculate w, h; append <svg> and <g> for plot area
-
 	var w = div.node().clientWidth - m.l - m.r,
 		h = div.node().clientHeight - m.t - m.b;
 	var plot = div
@@ -119,38 +95,59 @@ function drawTimeOfDay(arr,div){
 	plot.append('g').attr('class','brush')
 		.call(brush);
 
-	function brushend(){
-		console.log('timeseries:brushend');
+		function brushend(){
+			console.log('timeseries:brushend');
 
-		if(!d3.event.selection){
-			//if brush is cleared, then selected range will be empty
-			console.log('brush is cleared');
-			return;
-		}
-		console.log('selected range of the brush (in terms of screen pixels) is ' + d3.event.selection);
-		console.log('selected range of the brush (in terms of time of day) is ' + d3.event.selection.map(scaleX.invert));
+			if(!d3.event.selection){
+				//if brush is cleared, then selected range will be empty
+				console.log('brush is cleared');
+				return;
+			}
+			console.log('selected range of the brush (in terms of screen pixels) is ' + d3.event.selection);
+			console.log('selected range of the brush (in terms of time of day) is ' + d3.event.selection.map(scaleX.invert));
 
-/*		Exercise 2 part 1:
-		With the selected range of the brush, update the crossfilter
-		and then update the userType and userGender pie charts
-*/
+	/*		Exercise 2 part 1:
+			With the selected range of the brush, update the crossfilter
+			and then update the userType and userGender pie charts
+	*/
 
-    var selected = d3.event.selection.map(scaleX.invert);
-		console.log(selected);
-    var cfSelect = crossfilter(arr)
-		    .dimension(function(d){ return d.startTime.getHours() + d.startTime.getMinutes()/60 })
-		    .filterRange(selected);
-		var selectedArr = cfSelect.top(Infinity);
-    console.log(selectedArr);
-		drawUserType(selectedArr);
-		drawUserGender(selectedArr);
-		//drawUserGender(selectedArr, plot3);
-}
+	    var cfSelect = crossfilter(arr)
+			    .dimension(function(d){ return d.startTime.getHours() + d.startTime.getMinutes()/60 })
+			    .filterRange(d3.event.selection.map(scaleX.invert));
+			var selectedArr = cfSelect.top(Infinity);
+	    console.log(selectedArr);
+			drawUserType(selectedArr, plot2);
+			drawUserGender(selectedArr, plot3);
+	}
 
 }
 
-function drawUserType(arr){
+function drawUserType(arr,div){
+	var w = div.node().clientWidth - m.l - m.r,
+		h = div.node().clientHeight - m.t - m.b;
+	// var plot = div
+	// 	.append('svg')
+	// 	.attr('width', w + m.l + m.r)
+	// 	.attr('height', h + m.t + m.b)
+	// 	.append('g')
+	// 	.attr('class','canvas')
+	// 	.attr('transform','translate('+m.l+','+m.t+')');
+	var svg = div
+			.selectAll('svg')
+			.data([arr]);
+	var svgEnter = svg
+			.enter()
+			.append('svg');
 
+	var svgMerge = svgEnter
+			.merge(svg)
+			.attr('width', w + m.l + m.r)
+			.attr('height', h + m.t + m.b);
+
+  var plotEnter = svgEnter
+			.append('g')
+			.attr('class','plot time-series')
+			.attr('transform','translate('+m.l+','+m.t+')');
 
 	//Transform data
 	var tripsByUserType = d3.nest()
@@ -162,131 +159,141 @@ function drawUserType(arr){
 	//Further transform data to ready it for a pie layout
 	var pie = d3.pie()
 		.value(function(d){return d.value});
-	console.log( pie(tripsByUserType) );
+	console.table(pie(tripsByUserType) );
 	var arc = d3.arc()
-		.innerRadius(5)
-		.outerRadius(Math.min(w,h)/2);
+		.innerRadius(8)
+		.outerRadius(Math.min(w,h)/3);
 
 	//Draw
 /*	Exercise 2 part 2: this part of the code does not account for the update and exit sets
 	Refractor this code to account for the update and exit sets
 */
-// Draw or update piechart
-  var slices = piePlot
-			.append('g').attr('class','pie-chart')
-			.attr('transform','translate('+w2/2+','+h2/2+')')
-			.selectAll('.slice')
-			.data( pie(tripsByUserType) );
 
-	var pieUpdate = slices.enter()
-			.append('g').attr('class','slice')
-			.merge(slices);
+var pieSelect = svgMerge
+		.selectAll('g')
+		.data([1]);
 
-			pieUpdate
-			.append('path')
-			.transition(400)
-			.attr('d',arc)
-			.style('fill',function(d,i){
-				return i===0?'#03afeb':null
-			});
+var pieEnter = pieSelect.enter()
+		.append('g')
 
+var pieUpdate = pieEnter.merge(pieSelect)
+					.attr('class','pie-chart')
+					.attr('transform','translate('+2*w/3+','+2*h/3+')');
 
-// PROBLEMS ALERT! It will draw text for multiple times
-		var pieText	= pieUpdate.append('text')
-				.attr('transform',function(d){
-					var angle = (d.startAngle+d.endAngle)*180/Math.PI/2 - 90;
-					return 'rotate('+angle+')translate('+((Math.min(w,h)/2)+20)+')';
-				});
-		var	textUpdate = pieText
-				.merge(pieText)
-				.text(function(d){return d.data.key});
+var slicesSelect = pieUpdate.selectAll('g')
+	.data( pie(tripsByUserType) );
 
-      pieText.exit().remove();
-      slices.exit().remove();
+var slicesEnter = slicesSelect
+	.enter()
+	.append('g');
 
-	// var pieChart = plot
-	// 		.append('g').attr('class','pie-chart');
-	//
-	// var update = pieChart
-  //   	.attr('transform','translate('+w/2+','+h/2+')')
-	// 		.selectAll('.slice')
-	// 		.data( pie(tripsByUserType) );
-	//
-	// var enter = update.enter()
-	// 		.append('g').attr('class','slice')
-	// 		.append('path')
-	// 		.transition()
-	// 		.attr('d',arc)
-	// 		.style('fill',function(d,i){
-	// 			return i===0?'#03afeb':null
-	// 		});
-	//
-  //     update.merge(enter);
-  //     update.exit().remove();
-	// 		pieChart.exit().remove();
+slicesSelect.merge(slicesEnter).attr('class','slice');
 
-/*var slices = plot
-		.append('g').attr('class','pie-chart')
-		.attr('transform','translate('+w/2+','+h/2+')')
-		.selectAll('.slice')
-		.data( pie(tripsByUserType) )
-		.enter()
-		.append('g').attr('class','slice');
-	slices
-		.append('path')
-		.attr('d',arc)
-		.style('fill',function(d,i){
-			return i===0?'#03afeb':null
-		});
-	slices
-		.append('text')
-		.text(function(d){return d.data.key})
-		.attr('transform',function(d){
-			var angle = (d.startAngle+d.endAngle)*180/Math.PI/2 - 90;
-			return 'rotate('+angle+')translate('+((Math.min(w,h)/2)+20)+')';
-		});*/
+slicesEnter.append('path');
+slicesEnter.append('text');
+
+// update
+var slices = slicesSelect.merge(slicesEnter);
+
+slices
+	.select('path')
+	.transition(2000)
+	.attr('d',arc)
+	.style('fill',function(d,i){
+		return i===0?'#03afeb':null
+	});
+slices
+	.select('text').transition(2000)
+	.text(function(d){return d.data.key})
+	.attr('transform',function(d){
+		var angle = (d.startAngle+d.endAngle)*180/Math.PI/2 - 90;
+		return 'rotate('+angle+')translate('+((Math.min(w,h)/3)+20)+')';
+	});
 }
 
-function drawUserGender(arr){
-
+function drawUserGender(arr,div){
+	var w = div.node().clientWidth - m.l - m.r,
+		h = div.node().clientHeight - m.t - m.b;
 
 /*	Exercise 2 part 3: can you complete the user gender pie chart?
 */
-		var tripsByGender = d3.nest()
-			.key(function(d){return d.userGender})
-			.rollup(function(leaves){return leaves.length})
-			.entries(arr);
-		console.log(tripsByGender);
+var svg = div
+    .selectAll('svg')
+    .data([arr]);
+var svgEnter = svg
+    .enter()
+    .append('svg');
 
-		//Further transform data to ready it for a pie layout
-		var pie = d3.pie()
-			.value(function(d){return d.value});
-		console.log( pie(tripsByGender) );
+var svgMerge = svgEnter
+    .merge(svg)
+    .attr('width', w + m.l + m.r)
+    .attr('height', h + m.t + m.b);
 
-		var arc = d3.arc()
-			.innerRadius(5)
-			.outerRadius(Math.min(w,h)/2);
+var plotEnter = svgEnter
+    .append('g')
+    .attr('class','plot time-series')
+    .attr('transform','translate('+m.l+','+m.t+')');
 
-		// Draw or update piechart
-		var slices = piePlotGender
-				.append('g').attr('class','pie-chart')
-				.attr('transform','translate('+w2/2+','+h2/2+')')
-				.selectAll('.slice')
-				.data( pie(tripsByGender) );
+//Transform data
+var tripsByUserGender = d3.nest()
+  .key(function(d){return d.userGender})
+  .rollup(function(leaves){return leaves.length})
+  .entries(arr);
+console.log(tripsByUserGender);
 
-		var pieUpdate = slices.enter()
-				.append('g').attr('class','slice')
-				.merge(slices);
+//Further transform data to ready it for a pie layout
+  var pie = d3.pie()
+    .value(function(d){return d.value});
+  console.table(pie(tripsByUserGender) );
+  var arc = d3.arc()
+    .innerRadius(8)
+    .outerRadius(Math.min(w,h)/3);
 
-				pieUpdate
-				.append('path')
-				.transition(400)
-				.attr('d',arc)
-				.style('fill',function(d,i){
-					if(i===0) {return '#03afeb'}
-					if(i===1) {return null}
-					if(i===2) {return '#ff549b'}
-				});
+  var pieSelect = svgMerge
+    .selectAll('g')
+    .data([1]);
+
+  var pieEnter = pieSelect.enter()
+    .append('g')
+
+  var pieUpdate = pieEnter.merge(pieSelect)
+          .attr('class','pie-chart')
+          .attr('transform','translate('+2*w/3+','+2*h/3+')');
+
+  var slicesSelect = pieUpdate.selectAll('g')
+  .data( pie(tripsByUserGender) );
+
+  var slicesEnter = slicesSelect
+  .enter()
+  .append('g');
+
+  slicesSelect.merge(slicesEnter).attr('class','slice');
+
+  slicesEnter.append('path');
+  slicesEnter.append('text');
+
+  // update
+  var slices = slicesSelect.merge(slicesEnter);
+
+  slices
+  .select('path')
+  .transition(2000)
+  .attr('d',arc)
+  .style('fill',function(d,i){
+    if (i===0) return null;
+    else if (i===1) {
+      return '#03afeb';
+    }  else{
+      return '#ff7fd0';
+    }
+  });
+  slices
+  .select('text').transition(2000)
+  .text(function(d){return d.data.key})
+  .attr('transform',function(d){
+    var angle = (d.startAngle+d.endAngle)*180/Math.PI/2 - 90;
+    return 'rotate('+angle+')translate('+((Math.min(w,h)/3)+20)+')';
+  });
 
 }
 
